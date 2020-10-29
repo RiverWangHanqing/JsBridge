@@ -36,6 +36,7 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 	}
 
 	private List<String> whiteList = new ArrayList<String>();
+	private boolean whiteListEnable = false;
 
 	public void setStartupMessage(List<Message> startupMessage) {
 		this.startupMessage = startupMessage;
@@ -43,6 +44,10 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 
 	public void setWhiteList(List<String> whiteList) {
 		this.whiteList = whiteList;
+	}
+
+	public void setWhiteListEnable(boolean whiteListEnable) {
+		this.whiteListEnable = whiteListEnable;
 	}
 
 	private long uniqueId = 0;
@@ -191,28 +196,35 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 									}
 								};
 							}
-							BridgeHandler handler;
 
-							boolean isUseMessageHandlers = false;
+                            BridgeHandler handler;
 
-							//验证白名单
-							if (!TextUtils.isEmpty(m.getHandlerName())) {
-								for (String s : whiteList) {
-									String url = getUrl();
-									String host = Uri.parse(url).getHost();
-									if (url.startsWith("file:///android_asset/")//本地文件
-											|| (!TextUtils.isEmpty(host) && host.endsWith(s))) {
-										isUseMessageHandlers = true;
-										break;
-									}
-								}
-							}
+                            boolean isUseMessageHandlers = false;
 
-							if (isUseMessageHandlers) {
-								handler = messageHandlers.get(m.getHandlerName());
-							} else {
-								handler = defaultHandler;
-							}
+                            if (!TextUtils.isEmpty(m.getHandlerName())) {
+                                // 验证白名单
+                                if (whiteListEnable) {
+                                    String url = getUrl();
+                                    if (!TextUtils.isEmpty(url)) {
+                                        for (String whiteHost : whiteList) {
+                                            String host = Uri.parse(url).getHost();
+                                            if (url.startsWith("file:///android_asset/") // 本地文件
+                                                    || (!TextUtils.isEmpty(host) && host.endsWith(whiteHost))) {
+                                                isUseMessageHandlers = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    isUseMessageHandlers = true;
+                                }
+                            }
+
+                            if (isUseMessageHandlers) {
+                                handler = messageHandlers.get(m.getHandlerName());
+                            } else {
+                                handler = defaultHandler;
+                            }
 							if (handler != null) {
 								handler.handler(m.getData(), responseFunction);
 							}
