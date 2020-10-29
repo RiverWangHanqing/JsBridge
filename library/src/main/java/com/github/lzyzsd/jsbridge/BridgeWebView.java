@@ -3,6 +3,7 @@ package com.github.lzyzsd.jsbridge;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -34,8 +35,14 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 		return startupMessage;
 	}
 
+	private List<String> whiteList = new ArrayList<String>();
+
 	public void setStartupMessage(List<Message> startupMessage) {
 		this.startupMessage = startupMessage;
+	}
+
+	public void setWhiteList(List<String> whiteList) {
+		this.whiteList = whiteList;
 	}
 
 	private long uniqueId = 0;
@@ -190,7 +197,18 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 							} else {
 								handler = defaultHandler;
 							}
-							if (handler != null){
+
+							//验证白名单
+							boolean isInWhiteList = false;
+							for (String s : whiteList) {
+								String host = Uri.parse(getUrl()).getHost();
+								if (host.endsWith(s)
+										|| (TextUtils.isEmpty(host) && getUrl().startsWith("file:///android_asset"))) {//本地文件
+									isInWhiteList = true;
+								}
+							}
+
+							if (handler != null && isInWhiteList) {
 								handler.handler(m.getData(), responseFunction);
 							}
 						}
