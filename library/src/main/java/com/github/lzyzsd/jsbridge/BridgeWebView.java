@@ -2,40 +2,34 @@ package com.github.lzyzsd.jsbridge;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @SuppressLint("SetJavaScriptEnabled")
 public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 
-	private final String TAG = "BridgeWebView";
-
 	public static final String toLoadJs = "WebViewJavascriptBridge.js";
-	Map<String, CallBackFunction> responseCallbacks = new HashMap<String, CallBackFunction>();
-	Map<String, BridgeHandler> messageHandlers = new HashMap<String, BridgeHandler>();
+	Map<String, CallBackFunction> responseCallbacks = new HashMap<>();
+	Map<String, BridgeHandler> messageHandlers = new HashMap<>();
 	BridgeHandler defaultHandler = new DefaultHandler();
 
-	private List<Message> startupMessage = new ArrayList<Message>();
+	private List<Message> startupMessage = new ArrayList<>();
 
 	public List<Message> getStartupMessage() {
 		return startupMessage;
 	}
 
-	private List<String> whiteList = new ArrayList<String>();
+	private List<String> whiteList = new ArrayList<>();
 	private boolean whiteListEnable = false;
 
 	public void setStartupMessage(List<Message> startupMessage) {
@@ -81,9 +75,7 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 		this.setVerticalScrollBarEnabled(false);
 		this.setHorizontalScrollBarEnabled(false);
 		this.getSettings().setJavaScriptEnabled(true);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            WebView.setWebContentsDebuggingEnabled(true);
-        }
+		WebView.setWebContentsDebuggingEnabled(true);
 		this.setWebViewClient(generateBridgeWebViewClient());
 	}
 
@@ -98,7 +90,6 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
 		if (f != null) {
 			f.onCallBack(data);
 			responseCallbacks.remove(functionName);
-			return;
 		}
 	}
 
@@ -149,90 +140,82 @@ public class BridgeWebView extends WebView implements WebViewJavascriptBridge {
     }
 
 	void flushMessageQueue() {
-		if (Thread.currentThread() == Looper.getMainLooper().getThread()) {
-			loadUrl(BridgeUtil.JS_FETCH_QUEUE_FROM_JAVA, new CallBackFunction() {
+		if (Thread.currentThread() != Looper.getMainLooper().getThread()) {
+			return;
+		}
+		loadUrl(BridgeUtil.JS_FETCH_QUEUE_FROM_JAVA, data -> {
+			// deserializeMessage
+			List<Message> list;
+			try {
+				list = Message.toArrayList(data);
+			} catch (Exception e) {
+				e.printStackTrace();
+				return;
+			}
+			if (list.isEmpty()) {
+				return;
+			}
+			for (int i = 0; i < list.size(); i++) {
+				Message m = list.get(i);
+				String responseId = m.getResponseId();
+				// 是否是response
+				if (!TextUtils.isEmpty(responseId)) {
+					CallBackFunction function = Objects.requireNonNull(responseCallbacks.get(responseId));
+					String responseData = m.getResponseData();
+					function.onCallBack(responseData);
+					responseCallbacks.remove(responseId);
+				} else {
+					BridgeHandler handler;
+					boolean isUseMessageHandlers = false;
 
-				@Override
-				public void onCallBack(String data) {
-					// deserializeMessage
-					List<Message> list = null;
-					try {
-						list = Message.toArrayList(data);
-					} catch (Exception e) {
-                        e.printStackTrace();
-						return;
-					}
-					if (list == null || list.size() == 0) {
-						return;
-					}
-					for (int i = 0; i < list.size(); i++) {
-						Message m = list.get(i);
-						String responseId = m.getResponseId();
-						// 是否是response
-						if (!TextUtils.isEmpty(responseId)) {
-							CallBackFunction function = responseCallbacks.get(responseId);
-							String responseData = m.getResponseData();
-							function.onCallBack(responseData);
-							responseCallbacks.remove(responseId);
+					if (!TextUtils.isEmpty(m.getHandlerName())) {
+						// 验证白名单
+						if (whiteListEnable) {
+							String url = getUrl();
+							if (!TextUtils.isEmpty(url)) {
+								for (String whiteHost : whiteList) {
+									String host = Uri.parse(url).getHost();
+									if (url.startsWith("file:///android_asset/") // 本地文件
+											|| (!TextUtils.isEmpty(host) && host.endsWith(whiteHost))) {
+										isUseMessageHandlers = true;
+										break;
+									}
+								}
+							}
 						} else {
-							CallBackFunction responseFunction = null;
-							// if had callbackId
-							final String callbackId = m.getCallbackId();
-							if (!TextUtils.isEmpty(callbackId)) {
-								responseFunction = new CallBackFunction() {
-									@Override
-									public void onCallBack(String data) {
-										Message responseMsg = new Message();
-										responseMsg.setResponseId(callbackId);
-										responseMsg.setResponseData(data);
-										queueMessage(responseMsg);
-									}
-								};
-							} else {
-								responseFunction = new CallBackFunction() {
-									@Override
-									public void onCallBack(String data) {
-										// do nothing
-									}
-								};
-							}
-
-                            BridgeHandler handler;
-
-                            boolean isUseMessageHandlers = false;
-
-                            if (!TextUtils.isEmpty(m.getHandlerName())) {
-                                // 验证白名单
-                                if (whiteListEnable) {
-                                    String url = getUrl();
-                                    if (!TextUtils.isEmpty(url)) {
-                                        for (String whiteHost : whiteList) {
-                                            String host = Uri.parse(url).getHost();
-                                            if (url.startsWith("file:///android_asset/") // 本地文件
-                                                    || (!TextUtils.isEmpty(host) && host.endsWith(whiteHost))) {
-                                                isUseMessageHandlers = true;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    isUseMessageHandlers = true;
-                                }
-                            }
-
-                            if (isUseMessageHandlers) {
-                                handler = messageHandlers.get(m.getHandlerName());
-                            } else {
-                                handler = defaultHandler;
-                            }
-							if (handler != null) {
-								handler.handler(m.getData(), responseFunction);
-							}
+							isUseMessageHandlers = true;
 						}
 					}
+
+					if (isUseMessageHandlers) {
+						handler = messageHandlers.get(m.getHandlerName());
+					} else {
+						handler = defaultHandler;
+					}
+					if (handler == null) {
+						return;
+					}
+
+					CallBackFunction responseFunction;
+					// if had callbackId
+					final String callbackId = m.getCallbackId();
+					if (!TextUtils.isEmpty(callbackId)) {
+						responseFunction = data1 -> {
+							Message responseMsg = new Message();
+							responseMsg.setResponseId(callbackId);
+							responseMsg.setResponseData(data1);
+							queueMessage(responseMsg);
+						};
+					} else {
+						responseFunction = data12 -> {
+							// do nothing
+						};
+					}
+
+					handler.handler(m.getData(), responseFunction);
 				}
-			});
-		}
+			}
+		});
 	}
 
 	public void loadUrl(String jsUrl, CallBackFunction returnCallback) {

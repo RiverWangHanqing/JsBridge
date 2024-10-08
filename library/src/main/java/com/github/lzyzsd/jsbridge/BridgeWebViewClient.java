@@ -4,14 +4,13 @@ import android.graphics.Bitmap;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 
 /**
  * Created by bruce on 10/28/15.
  */
 public class BridgeWebViewClient extends WebViewClient {
-    private BridgeWebView webView;
+    private final BridgeWebView webView;
 
     public BridgeWebViewClient(BridgeWebView webView) {
         this.webView = webView;
@@ -45,9 +44,7 @@ public class BridgeWebViewClient extends WebViewClient {
     public void onPageFinished(WebView view, String url) {
         super.onPageFinished(view, url);
 
-        if (BridgeWebView.toLoadJs != null) {
-            BridgeUtil.webViewLoadLocalJs(view, BridgeWebView.toLoadJs);
-        }
+        BridgeUtil.webViewLoadLocalJs(view, BridgeWebView.toLoadJs);
 
         //
         if (webView.getStartupMessage() != null) {

@@ -1,11 +1,9 @@
 package com.github.lzyzsd.jsbridge;
 
 import android.content.Context;
-import android.util.Base64;
 import android.webkit.WebView;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
@@ -18,12 +16,13 @@ public class BridgeUtil {
 	final static String SPLIT_MARK = "/";
 	
 	final static String CALLBACK_ID_FORMAT = "JAVA_CB_%s";
-	final static String JS_HANDLE_MESSAGE_FROM_JAVA = "javascript:WebViewJavascriptBridge._handleMessageFromNative('%s');";
-	final static String JS_FETCH_QUEUE_FROM_JAVA = "javascript:WebViewJavascriptBridge._fetchQueue();";
 	public final static String JAVASCRIPT_STR = "javascript:";
+	public final static String JS_BRIDGE_PREFIX = JAVASCRIPT_STR + "WebViewJavascriptBridge.";
+	final static String JS_HANDLE_MESSAGE_FROM_JAVA = JS_BRIDGE_PREFIX + "_handleMessageFromNative('%s');";
+	final static String JS_FETCH_QUEUE_FROM_JAVA = JS_BRIDGE_PREFIX + "_fetchQueue();";
 	
 	public static String parseFunctionName(String jsUrl){
-		return jsUrl.replace("javascript:WebViewJavascriptBridge.", "").replaceAll("\\(.*\\);", "");
+		return jsUrl.replace(JS_BRIDGE_PREFIX, "").replaceAll("\\(.*\\);", "");
 	}
 	
 	
@@ -65,20 +64,18 @@ public class BridgeUtil {
 		String js = "var newscript = document.createElement(\"script\");";
 		js += "newscript.src=\"" + url + "\";";
 		js += "document.scripts[0].parentNode.insertBefore(newscript,document.scripts[0]);";
-		view.loadUrl("javascript:" + js);
+		view.loadUrl(JAVASCRIPT_STR + js);
 	}
 
     public static void webViewLoadLocalJs(WebView view, String path){
         String jsContent = assetFile2Str(view.getContext(), path);
-        view.loadUrl("javascript:" + jsContent);
+        view.loadUrl(JAVASCRIPT_STR + jsContent);
     }
 	
 	public static String assetFile2Str(Context c, String urlStr){
-		InputStream in = null;
-		try{
-			in = c.getAssets().open(urlStr);
+        try (InputStream in = c.getAssets().open(urlStr)) {
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));
-            String line = null;
+            String line;
             StringBuilder sb = new StringBuilder();
             do {
                 line = bufferedReader.readLine();
@@ -89,18 +86,11 @@ public class BridgeUtil {
 
             bufferedReader.close();
             in.close();
- 
+
             return sb.toString();
-		} catch (Exception e) {
-			e.printStackTrace();
-		} finally {
-			if(in != null) {
-				try {
-					in.close();
-				} catch (IOException e) {
-				}
-			}
-		}
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 		return null;
 	}
 }
