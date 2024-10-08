@@ -6,13 +6,12 @@ plugins {
 android {
     namespace 'com.github.lzyzsd.jsbridge.example'
 
-    compileSdkVersion 21
-    buildToolsVersion "21.1.2"
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.github.lzyzsd.jsbridge.example"
-        minSdkVersion 9
-        targetSdkVersion 21
+        minSdkVersion 21
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0"
     }
